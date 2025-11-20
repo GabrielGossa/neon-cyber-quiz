@@ -65,6 +65,33 @@ export type Database = {
         }
         Relationships: []
       }
+      scores: {
+        Row: {
+          created_at: string | null
+          id: string
+          mode: string
+          pseudo: string
+          score: number
+          total_questions: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          mode: string
+          pseudo: string
+          score: number
+          total_questions: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          mode?: string
+          pseudo?: string
+          score?: number
+          total_questions?: number
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null

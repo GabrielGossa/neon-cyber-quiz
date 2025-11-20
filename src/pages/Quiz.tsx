@@ -1,8 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { CheckCircle2, XCircle, Clock, Trophy } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Trophy, MessageCircle } from "lucide-react";
 import CyberButton from "@/components/CyberButton";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import AIChatPanel from "@/components/AIChatPanel";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 // Mock questions for demonstration
 const mockQuestions = [
@@ -41,17 +45,20 @@ const mockQuestions = [
 export default function Quiz() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const mode = searchParams.get("mode");
+  const mode = searchParams.get("mode") || "classic";
   const pseudo = searchParams.get("pseudo");
 
+  const [questions, setQuestions] = useState(mockQuestions);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [answered, setAnswered] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<boolean | null>(null);
   const [timeLeft, setTimeLeft] = useState(30);
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [questionsAnswered, setQuestionsAnswered] = useState(0);
 
-  const currentQuestion = mockQuestions[currentQuestionIndex];
-  const progress = ((currentQuestionIndex + 1) / mockQuestions.length) * 100;
+  const currentQuestion = questions[currentQuestionIndex];
+  const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
 
   useEffect(() => {
     if (mode === "chrono" && !answered && timeLeft > 0) {
@@ -62,22 +69,51 @@ export default function Quiz() {
     }
   }, [timeLeft, answered, mode]);
 
+  const saveScore = async (finalScore: number, totalQuestions: number) => {
+    try {
+      await supabase.from("scores").insert({
+        pseudo: pseudo || "Anonymous",
+        score: finalScore,
+        total_questions: totalQuestions,
+        mode: mode,
+      });
+    } catch (error) {
+      console.error("Error saving score:", error);
+    }
+  };
+
   const handleAnswer = (answer: boolean | null) => {
     setAnswered(true);
     setSelectedAnswer(answer);
+    const newQuestionsAnswered = questionsAnswered + 1;
+    setQuestionsAnswered(newQuestionsAnswered);
     
-    if (answer === currentQuestion.answer) {
+    const isCorrect = answer === currentQuestion.answer;
+    if (isCorrect) {
       setScore(score + 1);
     }
 
-    setTimeout(() => {
-      if (currentQuestionIndex < mockQuestions.length - 1) {
+    // Classic mode: wrong answer after 5 questions = game over
+    if (mode === "classic" && newQuestionsAnswered >= 5 && !isCorrect) {
+      setTimeout(async () => {
+        await saveScore(score, newQuestionsAnswered);
+        toast.error("Mauvaise réponse ! Le quiz est terminé.");
+        navigate(`/?ended=true`);
+      }, 1500);
+      return;
+    }
+
+    setTimeout(async () => {
+      if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
         setAnswered(false);
         setSelectedAnswer(null);
         setTimeLeft(30);
+        setShowAIChat(false);
       } else {
-        navigate(`/score?score=${score + (answer === currentQuestion.answer ? 1 : 0)}&total=${mockQuestions.length}&mode=${mode}&pseudo=${pseudo}`);
+        const finalScore = score + (isCorrect ? 1 : 0);
+        await saveScore(finalScore, questions.length);
+        navigate(`/score?score=${finalScore}&total=${questions.length}&mode=${mode}&pseudo=${pseudo}`);
       }
     }, 1500);
   };
@@ -116,23 +152,25 @@ export default function Quiz() {
           </h2>
 
           {!answered ? (
-            <div className="grid grid-cols-2 gap-4">
-              <CyberButton
-                size="xl"
-                variant="secondary"
-                onClick={() => handleAnswer(true)}
-                className="h-24 text-2xl font-bold"
-              >
-                OUI
-              </CyberButton>
-              <CyberButton
-                size="xl"
-                variant="primary"
-                onClick={() => handleAnswer(false)}
-                className="h-24 text-2xl font-bold"
-              >
-                NON
-              </CyberButton>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <CyberButton
+                  size="xl"
+                  variant="secondary"
+                  onClick={() => handleAnswer(true)}
+                  className="h-24 text-2xl font-bold"
+                >
+                  OUI
+                </CyberButton>
+                <CyberButton
+                  size="xl"
+                  variant="primary"
+                  onClick={() => handleAnswer(false)}
+                  className="h-24 text-2xl font-bold"
+                >
+                  NON
+                </CyberButton>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -158,9 +196,32 @@ export default function Quiz() {
                   La bonne réponse était : <span className="font-bold">{currentQuestion.answer ? "OUI" : "NON"}</span>
                 </p>
               </div>
+              
+              {/* AI Explanation Button */}
+              <div className="flex justify-center pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAIChat(true)}
+                  className="gap-2"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Demander une explication à l'IA
+                </Button>
+              </div>
             </div>
           )}
         </div>
+
+        {/* AI Chat Panel */}
+        {showAIChat && answered && (
+          <AIChatPanel
+            question={currentQuestion.question}
+            userAnswer={selectedAnswer}
+            correctAnswer={currentQuestion.answer}
+            onClose={() => setShowAIChat(false)}
+          />
+        )}
 
         {/* Timer progress for chrono mode */}
         {mode === "chrono" && !answered && (

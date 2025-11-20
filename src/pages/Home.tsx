@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Shield, Target, Clock, FolderTree, User } from "lucide-react";
+import { Shield, Target, Clock, FolderTree, User, UserCog } from "lucide-react";
 import CyberButton from "@/components/CyberButton";
 import ModeCard from "@/components/ModeCard";
+import Leaderboard from "@/components/Leaderboard";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import cyberHero from "@/assets/cyber-hero.jpg";
 
 export default function Home() {
@@ -33,8 +35,10 @@ export default function Home() {
   ];
 
   const handleStart = () => {
-    if (pseudo.trim() && selectedMode) {
-      navigate(`/quiz?mode=${selectedMode}&pseudo=${encodeURIComponent(pseudo)}`);
+    if (pseudo.trim()) {
+      // Default to classic mode if none selected
+      const mode = selectedMode || "classic";
+      navigate(`/quiz?mode=${mode}&pseudo=${encodeURIComponent(pseudo)}`);
     }
   };
 
@@ -67,6 +71,18 @@ export default function Home() {
       {/* Main Content */}
       <div className="container mx-auto px-4 -mt-16 relative z-20">
         <div className="max-w-4xl mx-auto space-y-8">
+          {/* Admin Button */}
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/admin-login")}
+              className="gap-2"
+            >
+              <UserCog className="h-4 w-4" />
+              Admin
+            </Button>
+          </div>
           {/* Pseudo Input */}
           <div className="bg-card border border-border rounded-lg p-8 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
@@ -83,10 +99,12 @@ export default function Home() {
             />
           </div>
 
-          {/* Mode Selection */}
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-center">Choisis ton mode de jeu</h2>
-            <div className="grid gap-4 md:grid-cols-3">
+          {/* Mode Selection - Optional, hidden by default */}
+          <details className="space-y-4">
+            <summary className="text-lg font-bold text-center cursor-pointer hover:text-primary transition-colors">
+              Choix du mode de jeu (optionnel)
+            </summary>
+            <div className="grid gap-4 md:grid-cols-3 pt-4">
               {modes.map((mode) => (
                 <ModeCard
                   key={mode.id}
@@ -96,19 +114,22 @@ export default function Home() {
                 />
               ))}
             </div>
-          </div>
+          </details>
 
           {/* Start Button */}
           <div className="flex justify-center pt-4">
             <CyberButton
               size="xl"
               onClick={handleStart}
-              disabled={!pseudo.trim() || !selectedMode}
+              disabled={!pseudo.trim()}
               className="min-w-[300px]"
             >
               Commencer le quiz
             </CyberButton>
           </div>
+
+          {/* Leaderboard */}
+          <Leaderboard />
 
           {/* About Section */}
           <div className="bg-card/50 border border-border rounded-lg p-6 mt-12">
